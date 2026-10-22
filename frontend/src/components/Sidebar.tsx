@@ -56,7 +56,15 @@ export const MENU: { title: string; items: Item[] }[] = [
   },
 ];
 
-export function Sidebar({ active, onNavigate }: { active: PageId; onNavigate: (id: PageId) => void }) {
+export function Sidebar({
+  active,
+  onNavigate,
+  onLock,
+}: {
+  active: PageId;
+  onNavigate: (id: PageId) => void;
+  onLock: () => void;
+}) {
   return (
     <nav
       aria-label="Main"
@@ -103,6 +111,7 @@ export function Sidebar({ active, onNavigate }: { active: PageId; onNavigate: (i
         </span>
         <button
           type="button"
+          onClick={onLock}
           className="min-h-[38px] cursor-pointer rounded-lg border border-border bg-surface text-[13px] font-medium hover:bg-page"
         >
           Lock app

@@ -45,6 +45,12 @@ body {
   outline-offset: 2px;
 }
 
+@media print {
+  body {
+    background: #ffffff;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

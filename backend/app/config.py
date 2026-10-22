@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     kinsum_data_dir: str = ""
     kinsum_port: int = 8000
+    # Lock the app after this many minutes with nobody using it.
+    kinsum_idle_lock_minutes: int = 10
 
     @property
     def data_dir(self) -> Path:
