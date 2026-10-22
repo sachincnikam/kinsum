@@ -1,0 +1,54 @@
+# ---------------------------------------------------------------
+# Kinsum — never commit personal financial data or secrets
+# ---------------------------------------------------------------
+
+# Secrets (AI API key, settings)
+.env
+.env.*
+!.env.example
+
+# App data — database, statements, backups, layouts, logs
+# (normally lives in %LOCALAPPDATA%\Kinsum, outside the repo;
+#  these patterns are a safety net in case anything lands here)
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.kinsum-backup
+backups/
+statements/
+layouts/
+ai-log/
+*.log
+
+# Real statements must never be committed (test fixtures live in sample-data/ and are fake)
+*.pdf
+*.csv
+*.ofx
+*.qfx
+*.xlsx
+!sample-data/**
+
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+Thumbs.db
+.DS_Store
+desktop.ini
