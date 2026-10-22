@@ -4,3 +4,6 @@ sqlalchemy>=2.0
 pydantic-settings>=2.6
 platformdirs>=4.3
 python-dotenv>=1.0
+# Encrypted database (SQLCipher, prebuilt for Windows and Mac) and the key file
+sqlcipher3-wheels>=0.5.7
+cryptography>=44

@@ -43,7 +43,8 @@ Every AI call is written to a local audit log. With no API key, the app must sti
 ## Tech stack
 
 - **Backend:** Python 3.13, FastAPI, uvicorn, SQLAlchemy, pydantic-settings, platformdirs.
-  SQLCipher-encrypted SQLite (planned, Phase 1). Tests use pytest + httpx.
+  SQLCipher-encrypted SQLite (`sqlcipher3-wheels`) and `cryptography` for the key file.
+  Tests use pytest + httpx.
 - **Frontend:** React 19, Vite 7, TypeScript, Tailwind v4 (`@tailwindcss/vite`), with IBM Plex
   Sans/Mono from @fontsource so it works offline.
 - In dev, Vite proxies `/api` to port 8000. In "prod", FastAPI serves `frontend/dist` with an
@@ -66,12 +67,32 @@ CI (`.github/workflows/tests.yml`) runs the backend tests and the frontend build
 ## Repo layout
 
 ```
-backend/app/        FastAPI app (config.py = settings + data dir, main.py = app + SPA serving)
-backend/tests/      pytest (conftest uses a temp KINSUM_DATA_DIR and no API key)
-frontend/src/       React app (components/: Sidebar, TopIcons, Icon, Logo)
+backend/app/        FastAPI app: config.py (settings, data dir), main.py (create_app, SPA serving),
+                    vault.py (key file), db.py (encrypted database), lock.py (app lock + routes)
+backend/tests/      pytest (fixtures in conftest: fresh app per test in tmp_path, fake clock)
+frontend/src/       React app: api.ts, App.tsx (lock state), components/ (LockScreen, Sidebar, …)
 docs/plan.md        product and build plan
 sample-data/        FAKE statements only (*.fake.*)
 ```
+
+## App lock and encryption (Phase 1 step 2)
+
+- Data folder holds `kinsum.db` (SQLCipher, raw 256-bit key) and `vault.json`. The vault has one
+  slot per passcode: the database key wrapped with AES-256-GCM under an scrypt-derived key. No
+  names or data in it. Losing `vault.json` means losing the database.
+- **Recovery key:** one more slot (`kind: "recovery"`) holding a printable 25-character key
+  (Crockford base32, 5 groups of 5). It is shown at setup and must be confirmed as saved; it
+  resets a forgotten passcode on the lock screen and is replaced right after use; Settings can
+  make a new one (needs the passcode). Passcode and recovery guesses share one wrong-try counter.
+- Extra slots (`Vault.add_slot`) are how each adult gets their own passcode in step 3; store the
+  slot id on the member row.
+- Every `/api` route needs the session cookie unless listed in `lock.PUBLIC_PATHS`, so new routes
+  are locked by default. Data routes take `db: Session = Depends(get_db)` (423 when locked).
+- Locking (button, idle timeout `KINSUM_IDLE_LOCK_MINUTES` default 10, or quitting) forgets the
+  key, closes the database and ends every session. `/api/lock/status` never counts as activity.
+- After 5 wrong passcodes the wait doubles from 30 s up to 15 min. Only `Host: localhost` or
+  `127.0.0.1` is accepted (blocks DNS rebinding); tests use `base_url="http://localhost"`.
+- Tables are made with `create_all` for now; add Alembic migrations with the first real tables.
 
 ## Data model (16 tables, planned)
 
@@ -115,7 +136,7 @@ written to `import_events`, which feeds the import activity log.
 
 - **Phase 1 Foundation (current):**
   1. Repo and Windows launcher ✅ (starter)
-  2. Passcode, app lock and encrypted DB
+  2. Passcode, app lock and encrypted DB ✅
   3. Members and accounts (owners, shared accounts, nicknames)
   4. Categories with icons
   5. CSV/PDF import with per-bank layouts
@@ -139,7 +160,9 @@ written to `import_events`, which feeds the import activity log.
 
 ## Open decisions
 
-- Idle auto-lock time (suggested 10 minutes).
+- Idle auto-lock time: 10 minutes by default, set with `KINSUM_IDLE_LOCK_MINUTES` in `.env`.
+- Recovery with several adults (step 3): the recovery screen must ask whose passcode to reset;
+  until then `LockManager.recover` refuses when there is more than one passcode slot.
 - Moving between computers uses an encrypted backup file. There is no sync between two laptops.
 
 ## Working conventions

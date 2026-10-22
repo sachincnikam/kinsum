@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, getLockStatus, setLockedHandler, type LockState } from "./api";
+import { LockScreen } from "./components/LockScreen";
+import { RecoveryKeySheet } from "./components/RecoveryKeySheet";
+import { RecoverySettings } from "./components/RecoverySettings";
 import { MENU, Sidebar, type PageId } from "./components/Sidebar";
 import { TopIcons } from "./components/TopIcons";
 
@@ -10,12 +14,104 @@ const TITLES: Partial<Record<PageId, string>> = {
   inbox: "Inbox",
 };
 
+// How often the open app re-checks whether the server has locked, and tells it someone is active.
+const STATUS_EVERY_MS = 15_000;
+const PING_EVERY_MS = 60_000;
+
 function pageTitle(id: PageId): string {
   for (const g of MENU) for (const i of g.items) if (i.id === id) return i.label;
   return TITLES[id] ?? "Kinsum";
 }
 
 export default function App() {
+  const [lock, setLock] = useState<LockState | "loading" | "offline">("loading");
+  const [notice, setNotice] = useState("");
+  const [retryAfter, setRetryAfter] = useState(0);
+  // A recovery key waiting to be printed, and why it was made.
+  const [sheet, setSheet] = useState<{ key: string; reason: "setup" | "recovered" | "replaced" } | null>(null);
+  const idleMinutes = useRef(10);
+
+  const refresh = useCallback(async () => {
+    try {
+      const status = await getLockStatus();
+      idleMinutes.current = status.idle_lock_minutes;
+      setRetryAfter(status.retry_after_seconds);
+      setLock((prev) => {
+        if (prev === "unlocked" && status.state === "locked") {
+          const m = status.idle_lock_minutes;
+          setNotice(`Kinsum locked itself after ${m} minute${m === 1 ? "" : "s"} without use.`);
+        }
+        return status.state;
+      });
+    } catch {
+      setLock("offline");
+    }
+  }, []);
+
+  useEffect(() => {
+    setLockedHandler(() => setLock("locked"));
+    refresh();
+  }, [refresh]);
+
+  // While unlocked: notice when the server locks (idle timeout, another window), and report activity.
+  useEffect(() => {
+    if (lock !== "unlocked") return;
+    let lastPing = Date.now();
+    const onActivity = () => {
+      if (Date.now() - lastPing < PING_EVERY_MS) return;
+      lastPing = Date.now();
+      api("/api/lock/ping", { method: "POST" }).catch(() => {});
+    };
+    const onVisible = () => document.visibilityState === "visible" && refresh();
+    const events = ["pointerdown", "keydown", "wheel", "pointermove"] as const;
+    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+    document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(refresh, STATUS_EVERY_MS);
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, onActivity));
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
+  }, [lock, refresh]);
+
+  // Never keep a recovery key on screen behind the lock.
+  useEffect(() => {
+    if (lock !== "unlocked") setSheet(null);
+  }, [lock]);
+
+  const lockNow = useCallback(async () => {
+    setNotice("");
+    setLock("locked");
+    await api("/api/lock/lock", { method: "POST" }).catch(() => {});
+  }, []);
+
+  if (lock === "loading") return null;
+  if (lock === "offline") {
+    return (
+      <main className="flex min-h-full items-center justify-center p-6 text-sm text-muted">
+        <p role="alert">Kinsum is not running. Start it with start.bat, then reload this page.</p>
+      </main>
+    );
+  }
+  if (lock !== "unlocked") {
+    return (
+      <LockScreen
+        mode={lock}
+        notice={notice}
+        retryAfter={retryAfter}
+        onUnlocked={(recoveryKey) => {
+          setNotice("");
+          if (recoveryKey) setSheet({ key: recoveryKey, reason: lock === "setup" ? "setup" : "recovered" });
+          setLock("unlocked");
+        }}
+      />
+    );
+  }
+  if (sheet) return <RecoveryKeySheet recoveryKey={sheet.key} reason={sheet.reason} onDone={() => setSheet(null)} />;
+  return <Home onLock={lockNow} onNewRecoveryKey={(key) => setSheet({ key, reason: "replaced" })} />;
+}
+
+function Home({ onLock, onNewRecoveryKey }: { onLock: () => void; onNewRecoveryKey: (key: string) => void }) {
   const [page, setPage] = useState<PageId>("dashboard");
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState(false);
@@ -29,7 +125,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-full">
-      <Sidebar active={page} onNavigate={setPage} />
+      <Sidebar active={page} onNavigate={setPage} onLock={onLock} />
       <main className="flex min-w-0 flex-1 flex-col gap-5 px-8 py-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="m-0 text-2xl font-semibold tracking-tight">{pageTitle(page)}</h1>
@@ -40,8 +136,8 @@ export default function App() {
           <section className="flex max-w-2xl flex-col gap-3 rounded-xl border border-border bg-surface p-6">
             <h2 className="m-0 text-lg font-semibold">Welcome to Kinsum</h2>
             <p className="m-0 text-sm leading-relaxed text-muted">
-              Your family's money, added up — privately, on this laptop. This is the starter version: the next steps add
-              the passcode, household members, accounts and statement import.
+              Your family's money, added up — privately, on this laptop. Your data is encrypted and locked behind your
+              passcode. The next steps add household members, accounts and statement import.
             </p>
             <div className="mt-1 flex flex-wrap gap-2 text-[13px]">
               <span className="rounded-full bg-page px-3 py-1">
@@ -61,6 +157,8 @@ export default function App() {
               )}
             </div>
           </section>
+        ) : page === "settings" ? (
+          <RecoverySettings onNewKey={onNewRecoveryKey} />
         ) : (
           <section className="rounded-xl border border-dashed border-border bg-surface p-6 text-sm text-muted">
             {pageTitle(page)} is coming in a later step of the build plan.
