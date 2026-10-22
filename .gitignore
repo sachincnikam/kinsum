@@ -24,13 +24,18 @@ layouts/
 ai-log/
 *.log
 
-# Real statements must never be committed (test fixtures live in sample-data/ and are fake)
+# Real statements must never be committed — anywhere in the repo, including sample-data/.
+# Fake test files are allowed ONLY if their name contains ".fake." (e.g. chase-checking.fake.csv).
 *.pdf
 *.csv
 *.ofx
 *.qfx
+*.qbo
+*.xls
 *.xlsx
-!sample-data/**
+*.txt
+!sample-data/**/*.fake.*
+!**/requirements*.txt
 
 # Python
 backend/.venv/
