@@ -100,3 +100,28 @@ export const ACCOUNT_TYPES: { id: AccountType; label: string }[] = [
   { id: "loan", label: "Loan" },
 ];
 export const LIABILITY_TYPES: AccountType[] = ["credit_card", "loan"];
+
+// ---- categories ---------------------------------------------------------------
+export type CategoryKind = "income" | "expense" | "investment" | "transfer";
+
+export type Category = {
+  id: number;
+  name: string;
+  parent_id: number | null;
+  kind: CategoryKind;
+  icon: string;
+  colour: string;
+  is_archived: boolean;
+};
+
+export const CATEGORY_KINDS: { id: CategoryKind; label: string; hint: string }[] = [
+  { id: "income", label: "Income", hint: "Money coming in." },
+  { id: "expense", label: "Spending", hint: "Money going out. Budgets and spending reports use these." },
+  { id: "investment", label: "Investments", hint: "Buys, sells and fees inside investment accounts." },
+  { id: "transfer", label: "Transfers", hint: "Money moving between your own accounts. Never counted as spending." },
+];
+
+export const CATEGORY_COLOURS = [
+  "#7C3AED", "#2563EB", "#0E7490", "#0F766E", "#047857", "#4D7C0F",
+  "#B45309", "#C2410C", "#DC2626", "#DB2777", "#4F46E5", "#475569",
+];

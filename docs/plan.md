@@ -141,14 +141,15 @@ Anything still uncertain lands in **Uncategorized** and shows in a "Needs review
 | Group | Example sub-categories |
 | --- | --- |
 | Income | Salary, Bonus, Interest, Dividends, Refunds, Other income |
-| Housing | Rent/Mortgage, Utilities, Internet & phone, Maintenance, Insurance |
+| Housing | Rent/Mortgage, Utilities, Internet & phone, Maintenance, Home insurance |
 | Food | Groceries, Restaurants, Coffee, Delivery |
-| Transportation | Fuel, Car payment, Insurance, Parking & tolls, Rideshare, Transit |
+| Transportation | Fuel, Car payment, Car insurance, Parking & tolls, Rideshare, Transit |
 | Shopping | Clothing, Electronics, Household, Online marketplaces |
-| Health | Medical, Pharmacy, Fitness, Insurance |
+| Health | Medical, Pharmacy, Fitness, Health insurance |
 | Lifestyle | Entertainment, Subscriptions, Travel, Gifts, Personal care |
 | Family & education | Childcare, School, Pets |
 | Financial | Fees & interest, Taxes, Charity |
+| Investments (investment kind) | Buy, Sell, Investment fees |
 | Transfers (excluded from spend) | Card payment, Between accounts, Investment contribution |
 
 **Category icons** — every category shows its icon on a small tile tinted with its colour, wherever the category appears: transaction rows, the edit sheet, budgets, the dashboard, the calendar's day list and the comparison table. Icons come from an open-source line-icon set (for example Lucide) bundled with the app, so they work offline. When you create or edit a category you pick an icon from a grid, search it by word ("pet", "gym", "rent"), and choose a colour from a palette; you can change either at any time. Uploading your own icon images is left for later.
