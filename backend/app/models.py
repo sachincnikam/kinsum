@@ -80,3 +80,41 @@ class AccountOwner(Base):
     member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), primary_key=True)
 
     account: Mapped[Account] = relationship(back_populates="owners")
+
+
+CATEGORY_KINDS = ("income", "expense", "investment", "transfer")
+
+# Category colours: dark enough that the icon reads on its own lightly tinted tile.
+CATEGORY_COLOURS = (
+    "#7C3AED",  # violet
+    "#2563EB",  # blue
+    "#0E7490",  # cyan
+    "#0F766E",  # teal
+    "#047857",  # green
+    "#4D7C0F",  # lime
+    "#B45309",  # amber
+    "#C2410C",  # orange
+    "#DC2626",  # red
+    "#DB2777",  # pink
+    "#4F46E5",  # indigo
+    "#475569",  # slate
+)
+
+
+class Category(Base):
+    """Two levels: groups (no parent) and their subcategories, which share the group's kind.
+
+    No row means "Uncategorized" (category_id is null wherever categories are used).
+    """
+
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(40))
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), default=None)
+    kind: Mapped[str] = mapped_column(String(12))
+    icon: Mapped[str] = mapped_column(String(40))  # a Lucide icon name, e.g. "shopping-cart"
+    colour: Mapped[str] = mapped_column(String(7))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

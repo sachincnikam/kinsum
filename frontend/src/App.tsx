@@ -5,6 +5,7 @@ import { RecoveryKeySheet } from "./components/RecoveryKeySheet";
 import { MENU, Sidebar, type PageId } from "./components/Sidebar";
 import { TopIcons } from "./components/TopIcons";
 import { WhoAreYou } from "./components/WhoAreYou";
+import { Categories } from "./pages/Categories";
 import { Household } from "./pages/Household";
 import { Settings } from "./pages/Settings";
 
@@ -179,6 +180,8 @@ function Home({
               )}
             </div>
           </section>
+        ) : page === "categories" ? (
+          <Categories me={me} />
         ) : page === "household" ? (
           <Household me={me} />
         ) : page === "settings" ? (

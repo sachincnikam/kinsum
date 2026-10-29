@@ -69,12 +69,14 @@ CI (`.github/workflows/tests.yml`) runs the backend tests and the frontend build
 ```
 backend/app/        FastAPI app: config.py (settings, data dir), main.py (create_app, SPA serving),
                     vault.py (key file), db.py (encrypted database + migrate), lock.py (app lock,
-                    sessions, get_me/require_household), models.py (tables), household.py (routes)
+                    sessions, get_me/require_household), models.py (tables), household.py and
+                    categories.py (routes)
 backend/migrations/ Alembic, hand-written revisions in versions/ (run on every unlock)
 backend/tests/      pytest (fixtures in conftest: fresh app per test in tmp_path, fake clock)
 frontend/src/       React app: api.ts (fetch + types), App.tsx (lock state, who is signed in),
-                    pages/ (Household, Settings), components/ (LockScreen, Modal, Sidebar, …),
-                    lib/money.ts (cents <-> text)
+                    pages/ (Household, Categories, Settings), components/ (LockScreen, Modal,
+                    CategoryIcon, Sidebar, …), lib/money.ts (cents <-> text),
+                    lib/categoryIcons.ts (curated Lucide icons + search words)
 docs/plan.md        product and build plan
 sample-data/        FAKE statements only (*.fake.*)
 ```
@@ -115,6 +117,21 @@ sample-data/        FAKE statements only (*.fake.*)
   pasted number), type, opening balance in cents, opening date, one or more owners. Balances are
   from the household's view: credit cards and loans store what is owed as negative; the form asks
   for "amount owed". Accounts and members are archived, never deleted.
+
+## Categories (Phase 1 step 4)
+
+- Two levels: groups (`parent_id` null) and subcategories, which always share the group's kind
+  (income, expense, investment, transfer). No row = "Uncategorized" (null `category_id`).
+- Starter set seeded by migration 0003 (plan's list plus an Investments group; the three
+  "Insurance" subcategories are named Home/Car/Health insurance so a flat picker is unambiguous).
+- Names are unique among active siblings. Archiving or restoring a group does the same to its
+  subcategories. Merging moves subcategories (same names fold together), re-points every column
+  in any table with a foreign key to `categories` (found automatically from the models, so new
+  tables need nothing extra), then deletes the source.
+- Reading needs any signed-in member; changing needs whole-household access.
+- Icons: the DB stores a Lucide name; the picker offers ~165 curated icons with search words
+  (`lib/categoryIcons.ts`), matched on word starts. Unknown names show a tag icon. A starter
+  icon must be in that list. Tiles use the category colour on a 12% tint (`CategoryIcon`).
 
 ## Data model (16 tables, planned)
 
@@ -160,7 +177,7 @@ written to `import_events`, which feeds the import activity log.
   1. Repo and Windows launcher ✅ (starter)
   2. Passcode, app lock and encrypted DB ✅
   3. Members and accounts (owners, shared accounts, nicknames) ✅
-  4. Categories with icons
+  4. Categories with icons ✅
   5. CSV/PDF import with per-bank layouts
   6. Duplicate and transfer detection
 - **Phase 2 Organize:** rules, merchant memory, AI for new merchants, tags and bulk edit,

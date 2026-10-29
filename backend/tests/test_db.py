@@ -46,7 +46,7 @@ def test_data_survives_reopening(tmp_path):
     db = Database(path, key)
     assert meta(db, "created_at") == created
     with db.engine.connect() as conn:
-        assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0002"
+        assert conn.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0003"
     db.close()
 
 
@@ -55,6 +55,7 @@ def test_step_2_database_is_upgraded(tmp_path):
     path, key = tmp_path / "kinsum.db", os.urandom(32)
     db = Database(path, key)
     with db.engine.begin() as conn:
+        conn.execute(text("DROP TABLE categories"))
         conn.execute(text("DROP TABLE account_owners"))
         conn.execute(text("DROP TABLE accounts"))
         conn.execute(text("DROP TABLE members"))
@@ -65,7 +66,7 @@ def test_step_2_database_is_upgraded(tmp_path):
     db = Database(path, key)
     with db.engine.connect() as conn:
         tables = {r[0] for r in conn.execute(text("SELECT name FROM sqlite_master WHERE type = 'table'"))}
-    assert {"app_meta", "members", "accounts", "account_owners"} <= tables
+    assert {"app_meta", "members", "accounts", "account_owners", "categories"} <= tables
     assert meta(db, "schema_version") == "1"  # old rows are kept
     db.close()
 
