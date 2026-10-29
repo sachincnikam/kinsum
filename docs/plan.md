@@ -58,7 +58,7 @@ Sixteen core tables hold everything; transactions sit at the centre, linked to a
 
 | Table | Key fields | Notes |
 | --- | --- | --- |
-| `users` | id, name, colour, role, can_sign_in, passcode_hash, access_scope, is_archived | Any number of family members (table could be named members); adults can have their own passcode and access level, children can be tracked without signing in |
+| `members` | id, name, colour, role, slot_id, access, is_archived | Any number of family members; adults can have their own passcode (a slot in the key file, so `slot_id` set = can sign in) and access level (whole household, or own and shared accounts), children can be tracked without signing in |
 | `accounts` | id, name, nickname, institution, last4, type, currency (USD), opening_balance, opening_date, is_active | Owners are listed in account_owners: one member, or several for a shared account. Type: checking, savings, credit_card, brokerage, retirement, loan |
 | `imports` | id, account_id, source (upload or folder), uploaded_by, file_name, file_hash, statement_key, format, period_start, period_end, closing_balance, row_count, rows_skipped, stored_copy, imported_at | One per imported statement; lets you undo a whole import |
 | `transactions` | id, account_id, import_id, date, description_raw, merchant_clean, amount, direction, category_id, notes, is_transfer, transfer_pair_id, recurring_id, spent_by_member_id, dedupe_hash, categorized_by | `categorized_by` = rule, memory, ai or manual |

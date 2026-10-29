@@ -15,6 +15,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import __version__
 from .config import REPO_ROOT, settings
+from .household import router as household_router
 from .lock import LockManager, LockMiddleware
 from .lock import router as lock_router
 
@@ -50,6 +51,7 @@ def create_app(data_dir: Path | None = None, idle_lock_minutes: int | None = Non
     app.add_middleware(LockMiddleware)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
     app.include_router(lock_router)
+    app.include_router(household_router)
 
     @app.get("/api/health")
     def health() -> dict:

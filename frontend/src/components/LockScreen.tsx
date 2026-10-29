@@ -30,13 +30,17 @@ const HEADINGS: Record<View, { title: string; intro: string }> = {
 
 export function LockScreen({ mode, notice, retryAfter, onUnlocked }: Props) {
   const [view, setView] = useState<View>(mode === "setup" ? "setup" : "unlock");
+  const [name, setName] = useState("");
   const [recoveryKey, setRecoveryKey] = useState("");
+  // Recovery with several adults: who to reset, once the key has been accepted.
+  const [choices, setChoices] = useState<{ id: number; name: string }[]>([]);
+  const [chosen, setChosen] = useState<number | null>(null);
   const [passcode, setPasscode] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(retryAfter);
-  const ids = { key: useId(), passcode: useId(), confirm: useId(), error: useId() };
+  const ids = { name: useId(), key: useId(), passcode: useId(), confirm: useId(), error: useId() };
   const choosing = view !== "unlock"; // setting a new passcode, so ask for it twice
 
   useEffect(() => setView(mode === "setup" ? "setup" : "unlock"), [mode]);
@@ -53,6 +57,8 @@ export function LockScreen({ mode, notice, retryAfter, onUnlocked }: Props) {
     setPasscode("");
     setConfirm("");
     setRecoveryKey("");
+    setChoices([]);
+    setChosen(null);
   }
 
   async function submit(e: FormEvent) {
@@ -60,14 +66,19 @@ export function LockScreen({ mode, notice, retryAfter, onUnlocked }: Props) {
     setError("");
     if (choosing && passcode.length < MIN_PASSCODE) return setError(`Use at least ${MIN_PASSCODE} characters.`);
     if (choosing && passcode !== confirm) return setError("The two passcodes do not match.");
+    if (choices.length > 0 && chosen === null) return setError("Choose whose passcode to reset.");
 
     setBusy(true);
     try {
       const response =
         view === "setup"
-          ? await postJson("/api/lock/setup", { passcode })
+          ? await postJson("/api/lock/setup", { name, passcode })
           : view === "recover"
-            ? await postJson("/api/lock/recover", { recovery_key: recoveryKey, new_passcode: passcode })
+            ? await postJson("/api/lock/recover", {
+                recovery_key: recoveryKey,
+                new_passcode: passcode,
+                ...(chosen !== null ? { member_id: chosen } : {}),
+              })
             : await postJson("/api/lock/unlock", { passcode });
       const body = await response.json().catch(() => ({}));
       if (response.ok) {
@@ -75,7 +86,11 @@ export function LockScreen({ mode, notice, retryAfter, onUnlocked }: Props) {
         onUnlocked(body.recovery_key);
         return;
       }
-      setError(body.detail ?? "Something went wrong. Try again.");
+      if (Array.isArray(body.choices)) {
+        setChoices(body.choices);
+        return;
+      }
+      setError(Array.isArray(body.detail) ? "Please check the form." : (body.detail ?? "Something went wrong. Try again."));
       if (body.retry_after_seconds) setWait(body.retry_after_seconds);
       if (view === "unlock") setPasscode("");
     } catch {
@@ -115,6 +130,47 @@ export function LockScreen({ mode, notice, retryAfter, onUnlocked }: Props) {
           </p>
         )}
 
+        {view === "setup" && (
+          <label htmlFor={ids.name} className="flex flex-col gap-1.5 text-sm font-medium">
+            Your name
+            <input
+              id={ids.name}
+              autoComplete="given-name"
+              autoFocus
+              required
+              maxLength={60}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={busy}
+              className={inputClass}
+            />
+          </label>
+        )}
+
+        {view === "recover" && choices.length > 0 && (
+          <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+            <legend className="mb-1.5 p-0 text-sm font-medium">The key is right. Whose passcode should change?</legend>
+            {choices.map((c) => (
+              <label
+                key={c.id}
+                className={
+                  "flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm font-medium " +
+                  (chosen === c.id ? "border-primary bg-primary-soft" : "border-border")
+                }
+              >
+                <input
+                  type="radio"
+                  name="whose"
+                  checked={chosen === c.id}
+                  onChange={() => setChosen(c.id)}
+                  className="h-4 w-4 accent-primary"
+                />
+                {c.name}
+              </label>
+            ))}
+          </fieldset>
+        )}
+
         {view === "recover" && (
           <label htmlFor={ids.key} className="flex flex-col gap-1.5 text-sm font-medium">
             Recovery key
@@ -141,7 +197,7 @@ export function LockScreen({ mode, notice, retryAfter, onUnlocked }: Props) {
             id={ids.passcode}
             type="password"
             autoComplete={choosing ? "new-password" : "current-password"}
-            autoFocus={view !== "recover"}
+            autoFocus={view === "unlock"}
             required
             value={passcode}
             onChange={(e) => setPasscode(e.target.value)}

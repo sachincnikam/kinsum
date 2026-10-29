@@ -27,18 +27,18 @@ def test_setup_unlocks_and_creates_encrypted_files(unlocked, app, tmp_path):
 
 
 def test_setup_only_once(unlocked):
-    assert unlocked.post("/api/lock/setup", json={"passcode": "another-code"}).status_code == 409
+    assert unlocked.post("/api/lock/setup", json={"name": "Alex", "passcode": "another-code"}).status_code == 409
 
 
 def test_setup_rejects_short_passcode(client):
-    response = client.post("/api/lock/setup", json={"passcode": "123"})
+    response = client.post("/api/lock/setup", json={"name": "Alex", "passcode": "123"})
     assert response.status_code == 400
     assert state(client) == "setup"
 
 
 def test_setup_refuses_when_key_file_is_missing(client, tmp_path):
     (tmp_path / "kinsum.db").write_bytes(b"existing encrypted data")
-    assert client.post("/api/lock/setup", json={"passcode": PASSCODE}).status_code == 400
+    assert client.post("/api/lock/setup", json={"name": "Alex", "passcode": PASSCODE}).status_code == 400
 
 
 def test_lock_then_unlock(unlocked):
@@ -131,7 +131,7 @@ def test_change_passcode(unlocked):
 
 
 def test_change_passcode_needs_a_session(client):
-    client.post("/api/lock/setup", json={"passcode": PASSCODE})
+    client.post("/api/lock/setup", json={"name": "Alex", "passcode": PASSCODE})
     client.cookies.clear()
     response = client.post("/api/lock/change-passcode", json={"current": PASSCODE, "new": "brand-new-code"})
     assert response.status_code == 423
@@ -142,11 +142,11 @@ def test_data_routes_get_the_database_only_when_unlocked(app, unlocked):
 
     @app.get("/api/test-meta")
     def read_meta(db: Session = Depends(get_db)) -> dict:
-        return {"schema_version": db.get(AppMeta, "schema_version").value}
+        return {"has_created_at": db.get(AppMeta, "created_at") is not None}
 
     app.router.routes.insert(0, app.router.routes.pop())  # ahead of the frontend catch-all
 
-    assert unlocked.get("/api/test-meta").json() == {"schema_version": "1"}
+    assert unlocked.get("/api/test-meta").json() == {"has_created_at": True}
     unlocked.post("/api/lock/lock")
     assert unlocked.get("/api/test-meta").status_code == 423
 
@@ -167,7 +167,7 @@ def test_data_survives_a_restart(unlocked, app, tmp_path):
 
 # ---- recovery key -------------------------------------------------------------
 def setup_with_key(client) -> str:
-    response = client.post("/api/lock/setup", json={"passcode": PASSCODE})
+    response = client.post("/api/lock/setup", json={"name": "Alex", "passcode": PASSCODE})
     assert response.status_code == 201
     return response.json()["recovery_key"]
 

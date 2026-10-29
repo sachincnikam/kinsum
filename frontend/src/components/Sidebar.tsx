@@ -1,3 +1,4 @@
+import type { Member } from "../api";
 import { Icon, type IconName } from "./Icon";
 import { LogoMark, Wordmark } from "./Logo";
 
@@ -58,10 +59,12 @@ export const MENU: { title: string; items: Item[] }[] = [
 
 export function Sidebar({
   active,
+  me,
   onNavigate,
   onLock,
 }: {
   active: PageId;
+  me: Member;
   onNavigate: (id: PageId) => void;
   onLock: () => void;
 }) {
@@ -105,6 +108,12 @@ export function Sidebar({
       ))}
       <div className="flex-1" />
       <div className="mt-4 flex flex-col gap-2 rounded-lg bg-page p-3">
+        <span className="flex items-center gap-2 text-[13px]">
+          <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: me.colour }} />
+          <span className="truncate">
+            Signed in as <strong className="font-semibold">{me.name}</strong>
+          </span>
+        </span>
         <span className="flex items-center gap-2 text-xs text-muted">
           <Icon name="lock" size={14} />
           Local · data stays on this laptop
