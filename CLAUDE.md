@@ -68,9 +68,13 @@ CI (`.github/workflows/tests.yml`) runs the backend tests and the frontend build
 
 ```
 backend/app/        FastAPI app: config.py (settings, data dir), main.py (create_app, SPA serving),
-                    vault.py (key file), db.py (encrypted database), lock.py (app lock + routes)
+                    vault.py (key file), db.py (encrypted database + migrate), lock.py (app lock,
+                    sessions, get_me/require_household), models.py (tables), household.py (routes)
+backend/migrations/ Alembic, hand-written revisions in versions/ (run on every unlock)
 backend/tests/      pytest (fixtures in conftest: fresh app per test in tmp_path, fake clock)
-frontend/src/       React app: api.ts, App.tsx (lock state), components/ (LockScreen, Sidebar, …)
+frontend/src/       React app: api.ts (fetch + types), App.tsx (lock state, who is signed in),
+                    pages/ (Household, Settings), components/ (LockScreen, Modal, Sidebar, …),
+                    lib/money.ts (cents <-> text)
 docs/plan.md        product and build plan
 sample-data/        FAKE statements only (*.fake.*)
 ```
@@ -84,15 +88,33 @@ sample-data/        FAKE statements only (*.fake.*)
   (Crockford base32, 5 groups of 5). It is shown at setup and must be confirmed as saved; it
   resets a forgotten passcode on the lock screen and is replaced right after use; Settings can
   make a new one (needs the passcode). Passcode and recovery guesses share one wrong-try counter.
-- Extra slots (`Vault.add_slot`) are how each adult gets their own passcode in step 3; store the
-  slot id on the member row.
+- Each adult who signs in has their own passcode slot; `members.slot_id` links them. A session
+  remembers its slot, so the app knows who is signed in (`get_me`). Two adults can't share a
+  passcode (unlocking couldn't tell them apart). Changing a passcode or making a recovery key
+  needs your *own* passcode. Recovery with several adults answers 409 with `choices` (names),
+  then takes `member_id`. A step-2 passcode with no member gets a one-time "What's your name?".
 - Every `/api` route needs the session cookie unless listed in `lock.PUBLIC_PATHS`, so new routes
   are locked by default. Data routes take `db: Session = Depends(get_db)` (423 when locked).
 - Locking (button, idle timeout `KINSUM_IDLE_LOCK_MINUTES` default 10, or quitting) forgets the
   key, closes the database and ends every session. `/api/lock/status` never counts as activity.
 - After 5 wrong passcodes the wait doubles from 30 s up to 15 min. Only `Host: localhost` or
   `127.0.0.1` is accepted (blocks DNS rebinding); tests use `base_url="http://localhost"`.
-- Tables are made with `create_all` for now; add Alembic migrations with the first real tables.
+- Tables come from Alembic migrations (`backend/migrations/versions`, written by hand, no
+  autogenerate) applied by `Database` on every open. Add a new revision for every table change.
+- The engine must keep `poolclass=QueuePool`: with the placeholder URL `sqlite://` SQLAlchemy would
+  pick `SingletonThreadPool`, which crashed the whole app on parallel requests.
+
+## Household (Phase 1 step 3)
+
+- Members: name, colour (fixed palette), role adult/teen/child, archived flag. Only adults sign in.
+- Access for adults who sign in: `household` (everything, and manages members, sign-ins and the
+  recovery key) or `own` (only accounts they own, alone or shared; can add and edit those, must
+  stay an owner). At least one signed-in adult with `household` access always remains.
+- Accounts: bank's name, institution, optional nickname (shown everywhere via `display_name`),
+  `last4` only (the API refuses anything but exactly 4 digits; the form keeps the last 4 of a
+  pasted number), type, opening balance in cents, opening date, one or more owners. Balances are
+  from the household's view: credit cards and loans store what is owed as negative; the form asks
+  for "amount owed". Accounts and members are archived, never deleted.
 
 ## Data model (16 tables, planned)
 
@@ -137,7 +159,7 @@ written to `import_events`, which feeds the import activity log.
 - **Phase 1 Foundation (current):**
   1. Repo and Windows launcher ✅ (starter)
   2. Passcode, app lock and encrypted DB ✅
-  3. Members and accounts (owners, shared accounts, nicknames)
+  3. Members and accounts (owners, shared accounts, nicknames) ✅
   4. Categories with icons
   5. CSV/PDF import with per-bank layouts
   6. Duplicate and transfer detection
@@ -161,8 +183,8 @@ written to `import_events`, which feeds the import activity log.
 ## Open decisions
 
 - Idle auto-lock time: 10 minutes by default, set with `KINSUM_IDLE_LOCK_MINUTES` in `.env`.
-- Recovery with several adults (step 3): the recovery screen must ask whose passcode to reset;
-  until then `LockManager.recover` refuses when there is more than one passcode slot.
+- Member picker (filter every screen by member or group) waits for Phase 3, when there is data
+  to filter.
 - Moving between computers uses an encrypted backup file. There is no sync between two laptops.
 
 ## Working conventions

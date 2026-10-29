@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, getLockStatus, setLockedHandler, type LockState } from "./api";
+import { api, getJson, getLockStatus, setLockedHandler, type LockState, type Member } from "./api";
 import { LockScreen } from "./components/LockScreen";
 import { RecoveryKeySheet } from "./components/RecoveryKeySheet";
-import { RecoverySettings } from "./components/RecoverySettings";
 import { MENU, Sidebar, type PageId } from "./components/Sidebar";
 import { TopIcons } from "./components/TopIcons";
+import { WhoAreYou } from "./components/WhoAreYou";
+import { Household } from "./pages/Household";
+import { Settings } from "./pages/Settings";
 
 type Health = { status: string; version: string; ai_enabled: boolean };
 
@@ -29,6 +31,8 @@ export default function App() {
   const [retryAfter, setRetryAfter] = useState(0);
   // A recovery key waiting to be printed, and why it was made.
   const [sheet, setSheet] = useState<{ key: string; reason: "setup" | "recovered" | "replaced" } | null>(null);
+  // Who is signed in: undefined while loading, null for a passcode from before members existed.
+  const [me, setMe] = useState<Member | null | undefined>(undefined);
   const idleMinutes = useRef(10);
 
   const refresh = useCallback(async () => {
@@ -74,9 +78,16 @@ export default function App() {
     };
   }, [lock, refresh]);
 
-  // Never keep a recovery key on screen behind the lock.
+  // Never keep a recovery key or anyone's details on screen behind the lock.
   useEffect(() => {
-    if (lock !== "unlocked") setSheet(null);
+    if (lock !== "unlocked") {
+      setSheet(null);
+      setMe(undefined);
+      return;
+    }
+    getJson<{ member: Member | null }>("/api/me")
+      .then((body) => setMe(body.member))
+      .catch(() => {});
   }, [lock]);
 
   const lockNow = useCallback(async () => {
@@ -108,10 +119,20 @@ export default function App() {
     );
   }
   if (sheet) return <RecoveryKeySheet recoveryKey={sheet.key} reason={sheet.reason} onDone={() => setSheet(null)} />;
-  return <Home onLock={lockNow} onNewRecoveryKey={(key) => setSheet({ key, reason: "replaced" })} />;
+  if (me === undefined) return null;
+  if (me === null) return <WhoAreYou onDone={setMe} />;
+  return <Home me={me} onLock={lockNow} onNewRecoveryKey={(key) => setSheet({ key, reason: "replaced" })} />;
 }
 
-function Home({ onLock, onNewRecoveryKey }: { onLock: () => void; onNewRecoveryKey: (key: string) => void }) {
+function Home({
+  me,
+  onLock,
+  onNewRecoveryKey,
+}: {
+  me: Member;
+  onLock: () => void;
+  onNewRecoveryKey: (key: string) => void;
+}) {
   const [page, setPage] = useState<PageId>("dashboard");
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState(false);
@@ -125,7 +146,7 @@ function Home({ onLock, onNewRecoveryKey }: { onLock: () => void; onNewRecoveryK
 
   return (
     <div className="flex min-h-full">
-      <Sidebar active={page} onNavigate={setPage} onLock={onLock} />
+      <Sidebar active={page} me={me} onNavigate={setPage} onLock={onLock} />
       <main className="flex min-w-0 flex-1 flex-col gap-5 px-8 py-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="m-0 text-2xl font-semibold tracking-tight">{pageTitle(page)}</h1>
@@ -137,7 +158,8 @@ function Home({ onLock, onNewRecoveryKey }: { onLock: () => void; onNewRecoveryK
             <h2 className="m-0 text-lg font-semibold">Welcome to Kinsum</h2>
             <p className="m-0 text-sm leading-relaxed text-muted">
               Your family's money, added up — privately, on this laptop. Your data is encrypted and locked behind your
-              passcode. The next steps add household members, accounts and statement import.
+              passcode. Next, add your family and accounts under Household &amp; accounts; statement import comes after
+              that.
             </p>
             <div className="mt-1 flex flex-wrap gap-2 text-[13px]">
               <span className="rounded-full bg-page px-3 py-1">
@@ -157,8 +179,10 @@ function Home({ onLock, onNewRecoveryKey }: { onLock: () => void; onNewRecoveryK
               )}
             </div>
           </section>
+        ) : page === "household" ? (
+          <Household me={me} />
         ) : page === "settings" ? (
-          <RecoverySettings onNewKey={onNewRecoveryKey} />
+          <Settings me={me} onNewRecoveryKey={onNewRecoveryKey} />
         ) : (
           <section className="rounded-xl border border-dashed border-border bg-surface p-6 text-sm text-muted">
             {pageTitle(page)} is coming in a later step of the build plan.

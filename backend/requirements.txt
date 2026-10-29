@@ -7,3 +7,4 @@ python-dotenv>=1.0
 # Encrypted database (SQLCipher, prebuilt for Windows and Mac) and the key file
 sqlcipher3-wheels>=0.5.7
 cryptography>=44
+alembic>=1.14

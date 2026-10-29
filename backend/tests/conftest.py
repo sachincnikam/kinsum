@@ -47,5 +47,5 @@ def client(app):
 @pytest.fixture
 def unlocked(client):
     """A client that has finished first-run setup and holds a session cookie."""
-    assert client.post("/api/lock/setup", json={"passcode": PASSCODE}).status_code == 201
+    assert client.post("/api/lock/setup", json={"name": "Alex", "passcode": PASSCODE}).status_code == 201
     return client

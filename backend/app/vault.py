@@ -184,6 +184,14 @@ class Vault:
                 return
         raise VaultError("Passcode slot not found.")
 
+    def remove_slot(self, slot_id: str) -> None:
+        data = self._load()
+        kept = [s for s in data["slots"] if s["id"] != slot_id]
+        if not any(s.get("kind", PASSCODE) == PASSCODE for s in kept):
+            raise VaultError("The last passcode cannot be removed.")
+        data["slots"] = kept
+        self._save(data)
+
     def passcode_slot_ids(self) -> list[str]:
         return [s["id"] for s in self._load()["slots"] if s.get("kind", PASSCODE) == PASSCODE]
 
