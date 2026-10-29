@@ -46,3 +46,11 @@ def test_data_survives_reopening(tmp_path):
     assert meta(db, "created_at") == created
     assert meta(db, "schema_version") == "1"
     db.close()
+
+
+def test_uses_a_normal_connection_pool(tmp_path):
+    from sqlalchemy.pool import QueuePool
+
+    db = Database(tmp_path / "kinsum.db", os.urandom(32))
+    assert isinstance(db.engine.pool, QueuePool)
+    db.close()

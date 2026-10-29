@@ -8,6 +8,7 @@ from pathlib import Path
 
 from sqlalchemy import Engine, String, create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from sqlalchemy.pool import QueuePool
 from sqlcipher3 import dbapi2 as sqlcipher
 
 SCHEMA_VERSION = 1
@@ -43,7 +44,10 @@ class Database:
             conn.execute("PRAGMA cipher_log_level = NONE")
             return conn
 
-        self.engine: Engine = create_engine("sqlite://", creator=connect)
+        # The URL is a placeholder (the connection comes from connect). Name the pool, or
+        # SQLAlchemy treats "sqlite://" as in-memory and picks SingletonThreadPool, which
+        # closes other threads' connections mid-query: a hard crash under parallel requests.
+        self.engine: Engine = create_engine("sqlite://", creator=connect, poolclass=QueuePool)
         event.listen(self.engine, "connect", _on_connect)
         try:
             with self.engine.connect() as conn:
